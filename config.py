@@ -75,7 +75,13 @@ class Settings(BaseSettings):
         "Refuser toute commande incomplète."
     )
     welcome_message: str = (
-        "Bonjour ! Veuillez fournir le code station et les produits avec leurs quantités en litres."
+        "Bonjour, je suis votre assistant intelligent.\n\n"
+        "Je suis là pour simplifier et optimiser vos opérations quotidiennes. "
+        "Voici ce que je peux faire pour vous :\n"
+        "• Passer des commandes d'approvisionnement\n"
+        "• Suivre le statut de vos demandes d'approvisionnement\n"
+        "• Effectuer des relevés de cuve\n"
+        "• Effectuer des relevés de pompe"
     )
     claude_model: str = "claude-sonnet-4-6"
     max_tokens: int = 1024
