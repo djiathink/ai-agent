@@ -44,6 +44,10 @@ class Agent:
 
 
             # Extract text blocks
+            # DEBUG: log all content blocks
+            for i, block in enumerate(response.content):
+                print(f"[DEBUG block {i}] type={getattr(block, 'type', '?')} | {vars(block)}")
+
             reply = "\n".join(
                 block.text for block in response.content
                 if hasattr(block, "text") and block.text is not None
