@@ -28,11 +28,12 @@ class Agent:
             if settings.mcp_server_url:
                 response = await self.client.beta.messages.create(
                     **kwargs,
-                    mcp_servers=[
+                    tools=[
                         {
-                            "type": "url",
-                            "url": settings.mcp_server_url,
-                            "name": settings.mcp_server_name,
+                            "type": "mcp",
+                            "server_label": settings.mcp_server_name,
+                            "server_url": settings.mcp_server_url,
+                            "require_approval": "never",
                         }
                     ],
                     betas=["mcp-client-2025-04-04"],
