@@ -46,7 +46,12 @@ class Agent:
             # Extract text blocks
             # DEBUG: log all content blocks
             for i, block in enumerate(response.content):
-                print(f"[DEBUG block {i}] type={getattr(block, 'type', '?')} | {vars(block)}")
+                try:
+                    import json
+                    detail = json.dumps(block.model_dump(), ensure_ascii=False, default=str)
+                except Exception:
+                    detail = str(block)
+                print(f"[DEBUG block {i}] type={getattr(block, 'type', '?')} | {detail}")
 
             reply = "\n".join(
                 block.text for block in response.content
