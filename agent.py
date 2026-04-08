@@ -45,6 +45,14 @@ class Agent:
             # Log content block types for debugging
             block_types = [getattr(b, "type", type(b).__name__) for b in response.content]
             print(f"[DEBUG] stop_reason={response.stop_reason} blocks={block_types}")
+            for b in response.content:
+                btype = getattr(b, "type", "")
+                if btype == "mcp_tool_use":
+                    print(f"[DEBUG] tool_call: {getattr(b, 'name', '')} input={getattr(b, 'input', '')}")
+                elif btype == "mcp_tool_result":
+                    print(f"[DEBUG] tool_result: {getattr(b, 'content', '')}")
+                elif btype == "text":
+                    print(f"[DEBUG] text: {getattr(b, 'text', '')[:300]}")
 
             # Extract text blocks
             reply = "\n".join(
