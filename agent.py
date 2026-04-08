@@ -87,6 +87,15 @@ class Agent:
             elif not reply:
                 reply = "Je n'ai pas pu générer une réponse."
 
+        except anthropic.BadRequestError as e:
+            self.history.pop()
+            msg = str(e)
+            if "MCP" in msg or "mcp" in msg:
+                return (
+                    "Le service Odoo est temporairement indisponible. "
+                    "Veuillez réessayer dans quelques instants."
+                )
+            return f"Erreur de requête : {e}"
         except Exception as e:
             reply = f"Erreur: {e}"
             self.history.pop()
