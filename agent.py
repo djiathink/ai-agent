@@ -87,16 +87,18 @@ class Agent:
         except anthropic.BadRequestError as e:
             self.history.pop()
             msg = str(e)
+            print(f"[DEBUG BadRequestError] {msg}")
             if "MCP" in msg or "mcp" in msg:
                 return (
-                    "Le service Odoo est temporairement indisponible. "
-                    "Veuillez réessayer dans quelques instants."
+                    f"[DEBUG MCP BadRequestError]\n{msg}"
                 )
-            return f"Erreur de requête : {e}"
+            return f"[DEBUG BadRequestError] {e}"
         except Exception as e:
-            print(f"[ERROR] {type(e).__name__}: {e}")
+            import traceback
+            tb = traceback.format_exc()
+            print(f"[DEBUG ERROR] {type(e).__name__}: {e}\n{tb}")
             self.history.pop()
-            return f"Erreur: {e}"
+            return f"[DEBUG ERROR] {type(e).__name__}: {e}\n\n{tb}"
 
         self.history.append({"role": "assistant", "content": reply})
         return reply
