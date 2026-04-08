@@ -23,5 +23,9 @@ class Settings(BaseSettings):
     claude_model: str = "claude-sonnet-4-6"
     max_tokens: int = 1024
 
+    # --- MCP (optionnel) ---
+    mcp_server_url: str = ""
+    mcp_server_name: str = "odoo"
+
 
 settings = Settings()

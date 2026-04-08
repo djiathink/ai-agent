@@ -18,16 +18,35 @@ class Agent:
             self.history = self.history[-(MAX_HISTORY_PAIRS * 2):]
 
         try:
-            response = await self.client.messages.create(
+            kwargs = dict(
                 model=settings.claude_model,
                 max_tokens=settings.max_tokens,
                 system=settings.system_prompt,
                 messages=self.history,
             )
-            reply = response.content[0].text
+
+            if settings.mcp_server_url:
+                response = await self.client.beta.messages.create(
+                    **kwargs,
+                    mcp_servers=[
+                        {
+                            "type": "url",
+                            "url": settings.mcp_server_url,
+                            "name": settings.mcp_server_name,
+                        }
+                    ],
+                    betas=["mcp-client-2025-04-04"],
+                )
+            else:
+                response = await self.client.messages.create(**kwargs)
+
+            # Extract all text blocks (MCP may return multiple content blocks)
+            reply = "\n".join(
+                block.text for block in response.content if hasattr(block, "text")
+            ) or "Je n'ai pas pu générer une réponse."
+
         except Exception as e:
             reply = f"Erreur: {e}"
-            # Don't keep the failed user message in history
             self.history.pop()
             return reply
 
