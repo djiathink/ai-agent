@@ -44,7 +44,8 @@ class Agent:
 
             # Extract all text blocks (MCP may return multiple content blocks)
             reply = "\n".join(
-                block.text for block in response.content if hasattr(block, "text")
+                block.text for block in response.content
+                if hasattr(block, "text") and block.text is not None
             ) or "Je n'ai pas pu générer une réponse."
 
         except Exception as e:
