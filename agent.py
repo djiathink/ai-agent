@@ -42,17 +42,6 @@ class Agent:
             else:
                 response = await self.client.messages.create(**kwargs)
 
-            # Log content block types for debugging
-            block_types = [getattr(b, "type", type(b).__name__) for b in response.content]
-            print(f"[DEBUG] stop_reason={response.stop_reason} blocks={block_types}")
-            for b in response.content:
-                btype = getattr(b, "type", "")
-                if btype == "mcp_tool_use":
-                    print(f"[DEBUG] tool_call: {getattr(b, 'name', '')} input={getattr(b, 'input', '')}")
-                elif btype == "mcp_tool_result":
-                    print(f"[DEBUG] tool_result: {getattr(b, 'content', '')}")
-                elif btype == "text":
-                    print(f"[DEBUG] text: {getattr(b, 'text', '')[:300]}")
 
             # Extract text blocks
             reply = "\n".join(
@@ -95,10 +84,19 @@ class Agent:
             elif not reply:
                 reply = "Je n'ai pas pu générer une réponse."
 
+        except anthropic.BadRequestError as e:
+            self.history.pop()
+            msg = str(e)
+            if "MCP" in msg or "mcp" in msg:
+                return (
+                    "Le service Odoo est temporairement indisponible. "
+                    "Veuillez réessayer dans quelques instants."
+                )
+            return f"Erreur de requête : {e}"
         except Exception as e:
             print(f"[ERROR] {type(e).__name__}: {e}")
             self.history.pop()
-            return f"[DEBUG] {type(e).__name__}: {e}"
+            return f"Erreur: {e}"
 
         self.history.append({"role": "assistant", "content": reply})
         return reply
