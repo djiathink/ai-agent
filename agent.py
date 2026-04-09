@@ -77,10 +77,28 @@ class Agent:
             self.history.pop()
             return f"Erreur de requête : {e}"
         except anthropic.InternalServerError as e:
-            self.history.pop()
-            if "overloaded" in str(e).lower():
+            if "overloaded" in str(e).lower() and settings.deepseek_api_key:
+                print("[WARN] Anthropic overloaded, falling back to Deepseek")
+                try:
+                    import openai
+                    ds = openai.AsyncOpenAI(
+                        api_key=settings.deepseek_api_key,
+                        base_url="https://api.deepseek.com",
+                    )
+                    ds_messages = [{"role": "system", "content": settings.system_prompt}] + self.history
+                    ds_response = await ds.chat.completions.create(
+                        model="deepseek-chat",
+                        max_tokens=settings.max_tokens,
+                        messages=ds_messages,
+                    )
+                    reply = ds_response.choices[0].message.content or "Je n'ai pas pu générer une réponse."
+                except Exception as ds_err:
+                    print(f"[ERROR] Deepseek fallback failed: {ds_err}")
+                    self.history.pop()
+                    return "Le service est momentanément indisponible. Veuillez réessayer dans quelques instants."
+            else:
+                self.history.pop()
                 return "Le service est momentanément surchargé. Veuillez réessayer dans quelques instants."
-            return f"Erreur serveur : {e}"
         except Exception as e:
             print(f"[ERROR] {type(e).__name__}: {e}")
             self.history.pop()

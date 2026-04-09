@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     telegram_token: str
     anthropic_api_key: str
     openai_api_key: str = ""
+    deepseek_api_key: str = ""
 
     # --- Optionnel : URL publique du service (Railway la fournit automatiquement) ---
     # Si définie, le webhook Telegram sera enregistré au démarrage.
