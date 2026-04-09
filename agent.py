@@ -146,6 +146,12 @@ class Agent:
         if len(self.history) > MAX_HISTORY_PAIRS * 2:
             self.history = self.history[-(MAX_HISTORY_PAIRS * 2):]
 
+        # Ensure history ends with a user message (Anthropic requirement)
+        while self.history and self.history[-1].get("role") != "user":
+            self.history.pop()
+        if not self.history:
+            self.history.append({"role": "user", "content": user_message})
+
         kwargs = dict(
             model=settings.claude_model,
             max_tokens=settings.max_tokens,
