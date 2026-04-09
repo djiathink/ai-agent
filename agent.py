@@ -161,19 +161,11 @@ class Agent:
                 if hasattr(block, "text") and block.text is not None
             ).strip()
 
-            if not reply and any(
-                getattr(b, "type", "") in ("tool_use", "mcp_tool_use")
-                for b in response.content
-            ):
-                self.history.append({"role": "assistant", "content": response.content})
-                followup = await self._create_anthropic(**kwargs | {"messages": self.history})
-                reply = "\n".join(
-                    block.text for block in followup.content
-                    if hasattr(block, "text") and block.text is not None
-                ).strip() or "Commande transmise."
-                self.history.pop()
-            elif not reply:
-                reply = "Je n'ai pas pu générer une réponse."
+            if not reply:
+                reply = "Commande transmise." if any(
+                    getattr(b, "type", "") in ("tool_use", "mcp_tool_use")
+                    for b in response.content
+                ) else "Je n'ai pas pu générer une réponse."
 
         except anthropic.BadRequestError as e:
             self.history.pop()
