@@ -1,8 +1,10 @@
+import asyncio
 import anthropic
 from config import settings
 
-# Max messages kept in history per user (pairs of user+assistant)
 MAX_HISTORY_PAIRS = 20
+MAX_RETRIES = 3
+RETRY_DELAY = 5  # seconds
 
 
 class Agent:
@@ -10,104 +12,79 @@ class Agent:
         self.client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
         self.history: list[dict] = []
 
+    async def _create(self, **kwargs):
+        """Call Anthropic API with retry on overload (529)."""
+        for attempt in range(MAX_RETRIES):
+            try:
+                if settings.mcp_server_url:
+                    return await self.client.beta.messages.create(
+                        **kwargs,
+                        betas=["mcp-client-2025-04-04"],
+                        extra_body={
+                            "mcp_servers": [
+                                {
+                                    "type": "url",
+                                    "url": settings.mcp_server_url,
+                                    "name": settings.mcp_server_name,
+                                }
+                            ]
+                        },
+                    )
+                else:
+                    return await self.client.messages.create(**kwargs)
+            except anthropic.InternalServerError as e:
+                if "overloaded" in str(e).lower() and attempt < MAX_RETRIES - 1:
+                    await asyncio.sleep(RETRY_DELAY * (attempt + 1))
+                    continue
+                raise
+
     async def chat(self, user_message: str) -> str:
         self.history.append({"role": "user", "content": user_message})
 
-        # Trim history to avoid exceeding token limits
         if len(self.history) > MAX_HISTORY_PAIRS * 2:
             self.history = self.history[-(MAX_HISTORY_PAIRS * 2):]
 
+        kwargs = dict(
+            model=settings.claude_model,
+            max_tokens=settings.max_tokens,
+            system=settings.system_prompt,
+            messages=self.history,
+        )
+
         try:
-            kwargs = dict(
-                model=settings.claude_model,
-                max_tokens=settings.max_tokens,
-                system=settings.system_prompt,
-                messages=self.history,
-            )
-
-            if settings.mcp_server_url:
-                response = await self.client.beta.messages.create(
-                    **kwargs,
-                    betas=["mcp-client-2025-04-04"],
-                    extra_body={
-                        "mcp_servers": [
-                            {
-                                "type": "url",
-                                "url": settings.mcp_server_url,
-                                "name": settings.mcp_server_name,
-                            }
-                        ]
-                    },
-                )
-            else:
-                response = await self.client.messages.create(**kwargs)
-
-
-            # Extract text blocks
-            # DEBUG: log all content blocks
-            for i, block in enumerate(response.content):
-                try:
-                    import json
-                    detail = json.dumps(block.model_dump(), ensure_ascii=False, default=str)
-                except Exception:
-                    detail = str(block)
-                print(f"[DEBUG block {i}] type={getattr(block, 'type', '?')} | {detail}")
+            response = await self._create(**kwargs)
 
             reply = "\n".join(
                 block.text for block in response.content
                 if hasattr(block, "text") and block.text is not None
             ).strip()
 
-            # If no text but MCP tools were used, it means Claude called the tool
-            # but didn't generate a follow-up text — send a second turn to get it
             if not reply and any(
                 getattr(b, "type", "") in ("tool_use", "mcp_tool_use")
                 for b in response.content
             ):
-                # Append full assistant content (with tool blocks) to history
                 self.history.append({"role": "assistant", "content": response.content})
-
-                # Ask Claude to summarize the result
-                followup = await self.client.beta.messages.create(
-                    model=settings.claude_model,
-                    max_tokens=settings.max_tokens,
-                    system=settings.system_prompt,
-                    messages=self.history,
-                    betas=["mcp-client-2025-04-04"],
-                    extra_body={
-                        "mcp_servers": [
-                            {
-                                "type": "url",
-                                "url": settings.mcp_server_url,
-                                "name": settings.mcp_server_name,
-                            }
-                        ]
-                    },
-                )
+                followup = await self._create(**kwargs | {"messages": self.history})
                 reply = "\n".join(
                     block.text for block in followup.content
                     if hasattr(block, "text") and block.text is not None
                 ).strip() or "Commande transmise."
-
-                self.history.pop()  # remove the tool-blocks assistant turn
+                self.history.pop()
             elif not reply:
                 reply = "Je n'ai pas pu générer une réponse."
 
         except anthropic.BadRequestError as e:
             self.history.pop()
-            msg = str(e)
-            print(f"[DEBUG BadRequestError] {msg}")
-            if "MCP" in msg or "mcp" in msg:
-                return (
-                    f"[DEBUG MCP BadRequestError]\n{msg}"
-                )
-            return f"[DEBUG BadRequestError] {e}"
-        except Exception as e:
-            import traceback
-            tb = traceback.format_exc()
-            print(f"[DEBUG ERROR] {type(e).__name__}: {e}\n{tb}")
+            return f"Erreur de requête : {e}"
+        except anthropic.InternalServerError as e:
             self.history.pop()
-            return f"[DEBUG ERROR] {type(e).__name__}: {e}\n\n{tb}"
+            if "overloaded" in str(e).lower():
+                return "Le service est momentanément surchargé. Veuillez réessayer dans quelques instants."
+            return f"Erreur serveur : {e}"
+        except Exception as e:
+            print(f"[ERROR] {type(e).__name__}: {e}")
+            self.history.pop()
+            return f"Erreur: {e}"
 
         self.history.append({"role": "assistant", "content": reply})
         return reply
